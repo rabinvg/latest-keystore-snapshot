@@ -182,6 +182,21 @@ public final class KeyStore {
         return try key.sign(hash: data, password: password)
     }
 
+    /// Signs an array of hashes with the given password.
+    ///
+    /// - Parameters:
+    ///   - hashes: array of hashes to sign
+    ///   - account: account to use for signing
+    ///   - password: key password
+    /// - Returns: array of signatures
+    /// - Throws: `DecryptError` or `Secp256k1Error` or `KeyStore.Error`
+    public func signHashes(_ data: [Data], account: Account, password: String) throws -> [Data] {
+        guard let key = keysByAddress[account.address] else {
+            throw KeyStore.Error.accountNotFound
+        }
+        return try key.signHashes(data, password: password)
+    }
+
     // MARK: Helpers
 
     private func makeAccountURL(for key: KeystoreKey) -> URL {

@@ -137,6 +137,18 @@ public struct KeystoreKey {
         return try Secp256k1.shared.sign(hash: hash, privateKey: key)
     }
 
+    /// Signs multiple hashes with the given password.
+    ///
+    /// - Parameters:
+    ///   - hashes: array of hashes to sign
+    ///   - password: key password
+    /// - Returns: [signature]
+    /// - Throws: `DecryptError` or `Secp256k1Error`
+    public func signHashes(_ hashes: [Data], password: String) throws -> [Data] {
+        let key = try decrypt(password: password)
+        return try hashes.map { try Secp256k1.shared.sign(hash: $0, privateKey: key) }
+    }
+
     /// Generates a unique file name for this key.
     public func generateFileName(date: Date = Date(), timeZone: TimeZone = .current) -> String {
         // keyFileName implements the naming convention for keyfiles:
