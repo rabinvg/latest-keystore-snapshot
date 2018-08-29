@@ -39,8 +39,8 @@ public struct Address: Hashable, CustomStringConvertible {
         eip55String = Address.computeEIP55String(for: data)
     }
 
-    public init?(noBurnCheckString: String) {
-        guard let data = Data(hexString: noBurnCheckString), data.count == 20 else {
+    public init?(uncheckedAgainstNullAddress: String) {
+        guard let data = Data(hexString: uncheckedAgainstNullAddress), data.count == 20 else {
             return nil
         }
         self.data = data
