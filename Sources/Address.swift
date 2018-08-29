@@ -19,6 +19,7 @@ public struct Address: Hashable, CustomStringConvertible {
     /// - Precondition: data contains exactly 20 bytes
     public init(data: Data) {
         precondition(data.count == 20, "Address length should be 20 bytes")
+        precondition(Address.checkNotBurnAddress(data: data))
         self.data = data
         eip55String = Address.computeEIP55String(for: data)
     }
@@ -28,6 +29,10 @@ public struct Address: Hashable, CustomStringConvertible {
     /// - Note: User input should be validated by using `init(eip55:)`.
     public init?(string: String) {
         guard let data = Data(hexString: string), data.count == 20 else {
+            return nil
+        }
+        let notBurnAddress = Address.checkNotBurnAddress(data: data)
+        if !notBurnAddress {
             return nil
         }
         self.data = data
@@ -42,6 +47,10 @@ public struct Address: Hashable, CustomStringConvertible {
             return nil
         }
         self.data = data
+        let notBurnAddress = Address.checkNotBurnAddress(data: data)
+        if !notBurnAddress {
+            return nil
+        }
         eip55String = Address.computeEIP55String(for: data)
         if eip55String != string {
             return nil
@@ -59,6 +68,19 @@ public struct Address: Hashable, CustomStringConvertible {
     public static func == (lhs: Address, rhs: Address) -> Bool {
         return lhs.data == rhs.data
     }
+
+    //While it is very difficult to catch every case of burn address
+    //This catches many by checking if all bytes are the same
+    private static func checkNotBurnAddress(data: Data) -> Bool {
+        let addressBytes = Array(data)
+        for i in 0..<addressBytes.count {
+            if(addressBytes[i] != addressBytes[0]) {
+                return true
+            }
+        }
+        return false
+    }
+
 }
 
 extension Address {
