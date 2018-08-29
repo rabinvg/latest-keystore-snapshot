@@ -39,6 +39,14 @@ public struct Address: Hashable, CustomStringConvertible {
         eip55String = Address.computeEIP55String(for: data)
     }
 
+    public init?(noBurnCheckString: String) {
+        guard let data = Data(hexString: noBurnCheckString), data.count == 20 else {
+            return nil
+        }
+        self.data = data
+        eip55String = Address.computeEIP55String(for: data)
+    }
+
     /// Creates an address with an EIP55 string representation.
     ///
     /// This initializer will fail if the EIP55 string fails validation.
