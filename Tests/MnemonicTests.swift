@@ -11,7 +11,7 @@ class MnemonicTests: XCTestCase {
     func testDeriveSeed() {
         let mnemonic = "often tobacco bread scare imitate song kind common bar forest yard wisdom"
         let password = "testtest123"
-        let seed = Data(hexString: "b4186ab8ac0ebfd3c20f992d0b602639fe59f0e4d2e66dea487194580e0aa0031387c9f30488a7628ed7350a63dd97e1acb259896082e3b34a1ff0dd85c287d1")
+        let seed = Data(hex: "b4186ab8ac0ebfd3c20f992d0b602639fe59f0e4d2e66dea487194580e0aa0031387c9f30488a7628ed7350a63dd97e1acb259896082e3b34a1ff0dd85c287d1")
 
         XCTAssertEqual(Mnemonic.deriveSeed(mnemonic: mnemonic, password: password), seed)
     }
@@ -19,7 +19,7 @@ class MnemonicTests: XCTestCase {
     func testEncode() {
         let message = "c61d43dc5bb7a4e754d111dae8105b6f25356492df5e50ecb33b858d94f8c338"
         let expected = "ship tube warfare resist kid inhale fashion captain sustain dog bitter tattoo fashion rather enter type extend grain solve arch sun ladder artefact bronze"
-        let words = Mnemonic.generate(from: Data(hexString: message)!)
+        let words = Mnemonic.generate(from: Data(hex: message))
         XCTAssertEqual(words, expected)
     }
 
