@@ -1,4 +1,4 @@
-// Copyright © 2017 Trust.
+// Copyright © 2017-2018 Trust.
 //
 // This file is part of Trust. The full Trust copyright notice, including
 // terms governing use, modification, and redistribution, is contained in the
@@ -6,47 +6,39 @@
 
 import CryptoSwift
 import Foundation
-import secp256k1_ios
 import Security
+import TrustCore
 
 /// Key definition.
 public struct KeystoreKey {
-    /// Ethereum address.
-    public var address: Address
+    /// Wallet type.
+    public var type: WalletType
 
     /// Wallet UUID, optional.
     public var id: String?
 
+    /// Key's address
+    public var address: Address?
+
     /// Key header with encrypted private key and crypto parameters.
     public var crypto: KeystoreKeyHeader
+
+    /// Mnemonic passphrase
+    public var passphrase = ""
 
     /// Key version, must be 3.
     public var version = 3
 
+    /// Default coin for this key.
+    public var coin: SLIP.CoinType?
+
+    /// List of active accounts.
+    public var activeAccounts = [Account]()
+
     /// Creates a new `Key` with a password.
-    @available(iOS 10.0, *)
     public init(password: String) throws {
-        let privateAttributes: [String: Any] = [
-            kSecAttrIsExtractable as String: true,
-        ]
-        let parameters: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeEC,
-            kSecAttrKeySizeInBits as String: 256,
-            kSecPrivateKeyAttrs as String: privateAttributes,
-        ]
-
-        var pubKey: SecKey?
-        var privKey: SecKey?
-        let status = SecKeyGeneratePair(parameters as CFDictionary, &pubKey, &privKey)
-        guard let privateKey = privKey, status == noErr else {
-            fatalError("Failed to generate key pair")
-        }
-
-        guard let keyRepresentation = SecKeyCopyExternalRepresentation(privateKey, nil) as Data? else {
-            fatalError("Failed to extract new private key")
-        }
-        let key = keyRepresentation[(keyRepresentation.count - 32)...]
-        try self.init(password: password, key: key)
+        let mnemonic = Crypto.generateMnemonic(strength: 128)
+        try self.init(password: password, mnemonic: mnemonic, passphrase: "")
     }
 
     /// Initializes a `Key` from a JSON wallet.
@@ -56,34 +48,25 @@ public struct KeystoreKey {
     }
 
     /// Initializes a `Key` by encrypting a private key with a password.
-    public init(password: String, key: Data) throws {
+    public init(password: String, key: PrivateKey, coin: SLIP.CoinType?) throws {
         id = UUID().uuidString.lowercased()
-
-        let cipherParams = CipherParams()
-        let kdfParams = ScryptParams()
-
-        let scrypt = Scrypt(params: kdfParams)
-        let derivedKey = try scrypt.calculate(password: password)
-
-        let encryptionKey = derivedKey[0...15]
-        let aecCipher = try AES(key: encryptionKey.bytes, blockMode: CTR(iv: cipherParams.iv.bytes), padding: .noPadding)
-
-        let encryptedKey = try aecCipher.encrypt(key.bytes)
-        let prefix = derivedKey[(derivedKey.count - 16) ..< derivedKey.count]
-        let mac = KeystoreKey.computeMAC(prefix: prefix, key: Data(bytes: encryptedKey))
-
-        crypto = KeystoreKeyHeader(cipherText: Data(bytes: encryptedKey), cipherParams: cipherParams, kdfParams: kdfParams, mac: mac)
-
-        let pubKey = Secp256k1.shared.pubicKey(from: key)
-        address = KeystoreKey.decodeAddress(from: pubKey)
+        crypto = try KeystoreKeyHeader(password: password, data: key.data)
+        self.type = .encryptedKey
+        self.coin = coin
     }
 
-    /// Decodes an Ethereum address from a public key.
-    static func decodeAddress(from publicKey: Data) -> Address {
-        precondition(publicKey.count == 65, "Expect 64-byte public key")
-        precondition(publicKey[0] == 4, "Invalid public key")
-        let sha3 = publicKey[1...].sha3(.keccak256)
-        return Address(data: sha3[12..<32])
+    /// Initializes a `Key` by encrypting a mnemonic phrase with a password.
+    public init(password: String, mnemonic: String, passphrase: String = "") throws {
+        id = UUID().uuidString.lowercased()
+
+        guard let cstring = mnemonic.cString(using: .ascii) else {
+            throw EncryptError.invalidMnemonic
+        }
+        let data = Data(bytes: cstring.map({ UInt8($0) }))
+        crypto = try KeystoreKeyHeader(password: password, data: data)
+
+        type = .hierarchicalDeterministicWallet
+        self.passphrase = passphrase
     }
 
     /// Decrypts the key and returns the private key.
@@ -118,81 +101,101 @@ public struct KeystoreKey {
         return Data(bytes: decryptedPK)
     }
 
-    private static func computeMAC(prefix: Data, key: Data) -> Data {
+    static func computeMAC(prefix: Data, key: Data) -> Data {
         var data = Data(capacity: prefix.count + key.count)
         data.append(prefix)
         data.append(key)
         return data.sha3(.keccak256)
     }
 
-    /// Signs a hash with the given password.
-    ///
-    /// - Parameters:
-    ///   - hash: hash to sign
-    ///   - password: key password
-    /// - Returns: signature
-    /// - Throws: `DecryptError` or `Secp256k1Error`
-    public func sign(hash: Data, password: String) throws -> Data {
-        let key = try decrypt(password: password)
-        return try Secp256k1.shared.sign(hash: hash, privateKey: key)
-    }
-
-    /// Signs multiple hashes with the given password.
-    ///
-    /// - Parameters:
-    ///   - hashes: array of hashes to sign
-    ///   - password: key password
-    /// - Returns: [signature]
-    /// - Throws: `DecryptError` or `Secp256k1Error`
-    public func signHashes(_ hashes: [Data], password: String) throws -> [Data] {
-        let key = try decrypt(password: password)
-        return try hashes.map { try Secp256k1.shared.sign(hash: $0, privateKey: key) }
-    }
-
-    /// Generates a unique file name for this key.
-    public func generateFileName(date: Date = Date(), timeZone: TimeZone = .current) -> String {
-        // keyFileName implements the naming convention for keyfiles:
-        // UTC--<created_at UTC ISO8601>-<address hex>
-        return "UTC--\(filenameTimestamp(for: date, in: timeZone))--\(address.data.hexString)"
-    }
-
-    private func filenameTimestamp(for date: Date, in timeZone: TimeZone = .current) -> String {
-        var tz = ""
-        let offset = timeZone.secondsFromGMT()
-        if offset == 0 {
-            tz = "Z"
-        } else {
-            tz = String(format: "%03d00", offset/60)
-        }
-
-        let components = Calendar(identifier: .iso8601).dateComponents(in: timeZone, from: date)
-        return String(format: "%04d-%02d-%02dT%02d-%02d-%02d.%09d%@", components.year!, components.month!, components.day!, components.hour!, components.minute!, components.second!, components.nanosecond!, tz)
-    }
+//    /// Signs a hash with the given password.
+//    ///
+//    /// - Parameters:
+//    ///   - hash: hash to sign
+//    ///   - password: key password
+//    /// - Returns: signature
+//    /// - Throws: `DecryptError` or `Secp256k1Error`
+//    public func sign(hash: Data, password: String) throws -> Data {
+//        let key = try decrypt(password: password)
+//        return try Secp256k1.shared.sign(hash: hash, privateKey: key)
+//    }
+//
+//    /// Signs multiple hashes with the given password.
+//    ///
+//    /// - Parameters:
+//    ///   - hashes: array of hashes to sign
+//    ///   - password: key password
+//    /// - Returns: [signature]
+//    /// - Throws: `DecryptError` or `Secp256k1Error`
+//    public func signHashes(_ hashes: [Data], password: String) throws -> [Data] {
+//        let key = try decrypt(password: password)
+//        return try hashes.map { try Secp256k1.shared.sign(hash: $0, privateKey: key) }
+//    }
+//
+//    /// Generates a unique file name for this key.
+//    public func generateFileName(date: Date = Date(), timeZone: TimeZone = .current) -> String {
+//        // keyFileName implements the naming convention for keyfiles:
+//        // UTC--<created_at UTC ISO8601>-<address hex>
+//        return "UTC--\(filenameTimestamp(for: date, in: timeZone))--\(address.data.hexString)"
+//    }
+//
+//    private func filenameTimestamp(for date: Date, in timeZone: TimeZone = .current) -> String {
+//        var tz = ""
+//        let offset = timeZone.secondsFromGMT()
+//        if offset == 0 {
+//            tz = "Z"
+//        } else {
+//            tz = String(format: "%03d00", offset/60)
+//        }
+//
+//        let components = Calendar(identifier: .iso8601).dateComponents(in: timeZone, from: date)
+//        return String(format: "%04d-%02d-%02dT%02d-%02d-%02d.%09d%@", components.year!, components.month!, components.day!, components.hour!, components.minute!, components.second!, components.nanosecond!, tz)
+//    }
 }
 
 public enum DecryptError: Error {
     case unsupportedKDF
     case unsupportedCipher
+    case unsupportedCoin
     case invalidCipher
     case invalidPassword
+}
+
+public enum EncryptError: Error {
+    case invalidMnemonic
 }
 
 extension KeystoreKey: Codable {
     enum CodingKeys: String, CodingKey {
         case address
+        case type
         case id
         case crypto
+        case activeAccounts
         case version
+        case coin
     }
 
     enum UppercaseCodingKeys: String, CodingKey {
         case crypto = "Crypto"
     }
 
+    struct TypeString {
+        static let privateKey = "private-key"
+        static let mnemonic = "mnemonic"
+    }
+
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         let altValues = try decoder.container(keyedBy: UppercaseCodingKeys.self)
-        address = Address(data: try values.decodeHexString(forKey: .address))
+
+        switch try values.decodeIfPresent(String.self, forKey: .type) {
+        case TypeString.mnemonic?:
+            type = .hierarchicalDeterministicWallet
+        default:
+            type = .encryptedKey
+        }
+
         id = try values.decode(String.self, forKey: .id)
         if let crypto = try? values.decode(KeystoreKeyHeader.self, forKey: .crypto) {
             self.crypto = crypto
@@ -201,13 +204,62 @@ extension KeystoreKey: Codable {
             self.crypto = try altValues.decode(KeystoreKeyHeader.self, forKey: .crypto)
         }
         version = try values.decode(Int.self, forKey: .version)
+        coin = try values.decodeIfPresent(SLIP.CoinType.self, forKey: .coin)
+        address = try values.decodeIfPresent(String.self, forKey: .address).flatMap({
+            return KeystoreKey.address(for: coin, addressString: $0)
+        })
+        activeAccounts = try values.decodeIfPresent([Account].self, forKey: .activeAccounts) ?? []
+
+        if let address = address, activeAccounts.isEmpty {
+            let account = Account(wallet: .none, address: address, derivationPath: Ethereum().derivationPath(at: 0))
+            activeAccounts.append(account)
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(address.description, forKey: .address)
+        switch type {
+        case .encryptedKey:
+            try container.encode(TypeString.privateKey, forKey: .type)
+        case .hierarchicalDeterministicWallet:
+            try container.encode(TypeString.mnemonic, forKey: .type)
+        }
         try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(address?.description, forKey: .address)
         try container.encode(crypto, forKey: .crypto)
         try container.encode(version, forKey: .version)
+        try container.encode(activeAccounts, forKey: .activeAccounts)
+        try container.encodeIfPresent(coin, forKey: .coin)
+    }
+
+    public static func address(for coin: SLIP.CoinType?, addressString: String) -> Address? {
+        guard let coin = coin else {
+            return EthereumAddress(data: Data(hex: addressString))
+        }
+        return blockchain(coin: coin).address(string: addressString)
+    }
+}
+
+private extension String {
+    func drop0x() -> String {
+        if hasPrefix("0x") {
+            return String(dropFirst(2))
+        }
+        return self
+    }
+}
+
+extension SLIP.CoinType: Codable {
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let coinID = try container.decode(Int.self)
+        guard let slip = SLIP.CoinType(rawValue: coinID) else {
+            throw DecryptError.unsupportedCoin
+        }
+        self = slip
+    }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(self.rawValue)
     }
 }

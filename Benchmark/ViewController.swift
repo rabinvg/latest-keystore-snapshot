@@ -5,6 +5,7 @@
 // file LICENSE at the root of the source code distribution tree.
 
 import TrustKeystore
+import TrustCore
 import UIKit
 
 class ViewController: UIViewController {
@@ -39,7 +40,7 @@ class ViewController: UIViewController {
     func run() {
         log("Creating keystore ")
         let privateKey = Data(hex: "3a1076bf45ab87712ad64ccb3b10217737f7faacbf2872e88fdd9a537d8fe266")
-        let key = try! KeystoreKey(password: "password", key: privateKey)
+        let key = try! KeystoreKey(password: "password", key: PrivateKey(data: privateKey)!, coin: .ethereum)
         log("Decrypting keystore")
         let decrypted = try! key.decrypt(password: "password")
         log("Finished")

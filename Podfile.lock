@@ -1,40 +1,47 @@
 PODS:
-  - BigInt (3.1.0):
-    - SipHash (~> 1.2)
-  - CryptoSwift (1.3.2)
-  - secp256k1_ios (0.1.3)
-  - SipHash (1.2.2)
+  - BigInt (5.2.0)
+  - CryptoSwift (0.10.0)
+  - SwiftLint (0.51.0)
+  - SwiftProtobuf (1.25.2)
   - TrezorCrypto (0.0.9)
+  - TrustCore (0.2.2):
+    - BigInt
+    - SwiftProtobuf (~> 1.0)
+    - TrezorCrypto (~> 0.0.8)
 
 DEPENDENCIES:
-  - BigInt (~> 3.0)
-  - CryptoSwift (~> 1.0)
-  - secp256k1_ios (from `https://github.com/shamatar/secp256k1_ios.git`)
-  - TrezorCrypto
+  - BigInt
+  - CryptoSwift (~> 0.10.0)
+  - SwiftLint
+  - TrezorCrypto (~> 0.0.9)
+  - TrustCore (from `https://github.com/TrustWallet/trust-core`, branch `master`)
 
 SPEC REPOS:
   trunk:
     - BigInt
     - CryptoSwift
-    - SipHash
+    - SwiftLint
+    - SwiftProtobuf
     - TrezorCrypto
 
 EXTERNAL SOURCES:
-  secp256k1_ios:
-    :git: https://github.com/shamatar/secp256k1_ios.git
+  TrustCore:
+    :branch: master
+    :git: https://github.com/TrustWallet/trust-core
 
 CHECKOUT OPTIONS:
-  secp256k1_ios:
-    :commit: e3ab3e26fafc3688436528f2ca24cc679c7d746e
-    :git: https://github.com/shamatar/secp256k1_ios.git
+  TrustCore:
+    :commit: 833ec3f263bb9b257b6ec04359cb98d1bae7cf17
+    :git: https://github.com/TrustWallet/trust-core
 
 SPEC CHECKSUMS:
-  BigInt: 76b5dfdfa3e2e478d4ffdf161aeede5502e2742f
-  CryptoSwift: 093499be1a94b0cae36e6c26b70870668cb56060
-  secp256k1_ios: ac9ef04e761f43c58012b28548afa91493761f17
-  SipHash: fad90a4683e420c52ef28063063dbbce248ea6d4
+  BigInt: f668a80089607f521586bbe29513d708491ef2f7
+  CryptoSwift: 6c778d69282bed3b4e975ff97a79d074f20bb011
+  SwiftLint: 1b7561918a19e23bfed960e40759086e70f4dba5
+  SwiftProtobuf: 407a385e97fd206c4fbe880cc84123989167e0d1
   TrezorCrypto: bfeea47a052dca2c77d4a39e1e183865e52de14d
+  TrustCore: 378c82221f4d28a75da133d049710f5030427176
 
-PODFILE CHECKSUM: a94e78337fa48062d8bc316b9a29046cab6d8574
+PODFILE CHECKSUM: 807040ab51d57f3b98810158911bb6ba3527b77e
 
-COCOAPODS: 1.10.0
+COCOAPODS: 1.14.3

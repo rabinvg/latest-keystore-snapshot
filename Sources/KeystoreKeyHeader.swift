@@ -1,9 +1,10 @@
-// Copyright © 2017 Trust.
+// Copyright © 2017-2018 Trust.
 //
 // This file is part of Trust. The full Trust copyright notice, including
 // terms governing use, modification, and redistribution, is contained in the
 // file LICENSE at the root of the source code distribution tree.
 
+import CryptoSwift
 import Foundation
 
 /// Encrypted private key and crypto parameters.
@@ -32,6 +33,24 @@ public struct KeystoreKeyHeader {
         self.cipherParams = cipherParams
         self.kdfParams = kdfParams
         self.mac = mac
+    }
+
+    /// Initializes a `KeystoreKeyHeader` by encrypting data with a password with standard values.
+    public init(password: String, data: Data) throws {
+        let cipherParams = CipherParams()
+        let kdfParams = ScryptParams()
+
+        let scrypt = Scrypt(params: kdfParams)
+        let derivedKey = try scrypt.calculate(password: password)
+
+        let encryptionKey = derivedKey[0...15]
+        let aecCipher = try AES(key: encryptionKey.bytes, blockMode: CTR(iv: cipherParams.iv.bytes), padding: .noPadding)
+
+        let encryptedKey = try aecCipher.encrypt(data.bytes)
+        let prefix = derivedKey[(derivedKey.count - 16) ..< derivedKey.count]
+        let mac = KeystoreKey.computeMAC(prefix: prefix, key: Data(bytes: encryptedKey))
+
+        self.init(cipherText: Data(bytes: encryptedKey), cipherParams: cipherParams, kdfParams: kdfParams, mac: mac)
     }
 }
 

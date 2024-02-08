@@ -1,22 +1,23 @@
 {
+  "version": 3,
+  "id": "e0fe53d0-7a3d-4f65-88b1-9bb4e245a169",
   "crypto": {
-    "cipher": "aes-128-ctr",
+    "ciphertext": "64b5b416bb2bef882eb7cc63ed92c064e53c818ec46351e07ac140e5ba871596f1595fe6cad8333147fe68c031ba001b79b64dd1edd513043134217b7ffe1903ca23b1fbe823671827e3b2dff69bbd448d9cb79a3321ec8801f2a995",
     "cipherparams": {
-      "iv": "83dbcc02d8ccb40e466191a123791e0e"
+      "iv": "7aaf7eb6f4b0e7d995e8eac67e4d52eb"
     },
-    "ciphertext": "d172bf743a674da9cdad04534d56926ef8358534d458fffccd4e6ad2fbde479c",
     "kdf": "scrypt",
     "kdfparams": {
+      "r": 8,
+      "p": 6,
+      "n": 4096,
       "dklen": 32,
-      "n": 262144,
-      "p": 8,
-      "prf": "hmac-sha256",
-      "r": 1,
-      "salt": "ab0c7876052600dd703518d6fc3fe8984592145b591fc8fb5c6d43190334ba19"
+      "salt": "80132842c6cde8f9d04582932ef92c3cad3ba6b41e1296ef681692372886db86"
     },
-    "mac": "2103ac29920d71da29f15d75b4a16dbe95cfd7ff8faea1056c33131d846e3097"
+    "mac": "01816d0a5c31cd03b644f2d756ac8167c2498808040cbace8c35c46dcf06b7a1",
+    "cipher": "aes-128-ctr"
   },
-  "address": "008aeeda4d805471df9b2a5b0f38a0c3bcba786b",
-  "id": "e13b209c-3b2f-4327-bab0-3bef2e51630d",
-  "version": 3
+  "type": "mnemonic",
+  "coin": 60,
+  "address": "32dd55E0BCF509a35A3F5eEb8593fbEb244796b1"
 }
